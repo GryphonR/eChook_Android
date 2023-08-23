@@ -3,8 +3,10 @@ package com.ben.drivenbluetooth.util;
 import android.location.Location;
 
 import com.ben.drivenbluetooth.Global;
-import com.ben.drivenbluetooth.MainActivity;
+import com.ben.drivenbluetooth.events.SnackbarEvent;
 import com.ben.drivenbluetooth.threads.RaceStartMonitor;
+
+import org.greenrobot.eventbus.EventBus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,9 +71,10 @@ public class RaceObserver implements RaceStartMonitor.ThrottleListener{
             }
 
 			myRaceStartMonitor.start();
-			MainActivity.showMessage("Launch Mode Active - waiting for throttle input (minimum 20%)");
+			EventBus.getDefault().post(new SnackbarEvent("Launch Mode Active - waiting for throttle input (minimum 20%)"));
 		} catch (Exception e) {
-			MainActivity.showError(e);
+			EventBus.getDefault().post(new SnackbarEvent(e));
+e.printStackTrace();
 		}
 	}
 
@@ -109,10 +112,8 @@ public class RaceObserver implements RaceStartMonitor.ThrottleListener{
 	private boolean CheckIfCrossStartFinishLine_StartVector(Location location) {
 		if (location.distanceTo(Global.StartFinishLineLocation) <= Global.LAP_TRIGGER_RANGE) {
 			// we are in range! check to see if the bearing adds up
-			if (Global.StartFinishLineLocation.bearingTo(location) <= Global.StartFinishLineBearing + 45
-					&& Global.StartFinishLineLocation.bearingTo(location) >= Global.StartFinishLineBearing - 45) {
-				return true;
-			}
+			return Global.StartFinishLineLocation.bearingTo(location) <= Global.StartFinishLineBearing + 45
+					&& Global.StartFinishLineLocation.bearingTo(location) >= Global.StartFinishLineBearing - 45;
 		}
 		return false;
 	}
@@ -140,7 +141,7 @@ public class RaceObserver implements RaceStartMonitor.ThrottleListener{
 	public void onThrottleMax() {
 		_fireRaceStart();
 		raceStarted = true;
-		MainActivity.showMessage("Race start detected - lap timing has begun");
+		EventBus.getDefault().post(new SnackbarEvent("Race start detected - lap timing has begun"));
 	}
 
 	/*===================*/

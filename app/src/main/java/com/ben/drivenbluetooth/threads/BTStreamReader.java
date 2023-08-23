@@ -1,9 +1,13 @@
 package com.ben.drivenbluetooth.threads;
 
+import android.util.Log;
+
 import com.ben.drivenbluetooth.Global;
 import com.ben.drivenbluetooth.MainActivity;
+import com.ben.drivenbluetooth.events.SnackbarEvent;
 
-import org.acra.ACRA;
+import org.apache.commons.math3.exception.OutOfRangeException;
+import org.greenrobot.eventbus.EventBus;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,28 +30,38 @@ public class BTStreamReader extends Thread {
             this.mmInStream = Global.BTSocket.getInputStream();
 
         } catch (IOException e) {
-            MainActivity.showMessage("Bluetooth is not connected!");
+            EventBus.getDefault().post(new SnackbarEvent("Bluetooth is not connected!"));
         }
     }
 
     @Override
     public void run() {
 		byte[] buffer = new byte[1024];
-	    int bytes;
 		long latestMillis = System.currentTimeMillis();
+		int bytes;
 
 	    this.stopWorker = false;
 	    int readBufferPosition = 0;
 
 	    while (!this.stopWorker) {
 			try {
+//				Log.d("eChook", "Entering Stream Reader Loop");
+
 				int bytesAvailable = mmInStream.available();
+//				Log.d("eChook", "Bytes Available: " + bytesAvailable);
+
+				//Is there too much data in the buffer?
+//                if (bytesAvailable > 1024) {
+//                    EventBus.getDefault().post(new SnackbarEvent("Too Much BT Data!"));
+//                    mmInStream.skip(bytesAvailable - 1024); //This should stop the buffer overrun seen by some teams
+//                }
 
 				if (bytesAvailable > 0) {
 					byte[] packetBytes = new byte[bytesAvailable];
-					bytes = mmInStream.read(packetBytes);
+                    bytes = mmInStream.read(packetBytes);
 
-					// UpdateLocationSetting the timekeeping variable
+
+                    // UpdateLocationSetting the timekeeping variable
 					latestMillis = System.currentTimeMillis();
 					Global.BTState = Global.BTSTATE.CONNECTED;
 
@@ -56,9 +70,24 @@ public class BTStreamReader extends Thread {
 
 						if (b != Global.STOPBYTE) {
 							// delimiter not reached yet so continue adding to buffer
-							buffer[readBufferPosition] = b;
-							readBufferPosition++;
-						} else {
+//							Log.d("eChook", "Buffer position: "+readBufferPosition+" Data: "+b);
+
+							try {
+                                buffer[readBufferPosition] = b;
+                            } catch(OutOfRangeException e){
+//                                Log.d("eChook", "Stream Reader Buffer out of range");
+                            }
+
+                            if(readBufferPosition == buffer.length-1){
+//                                Log.d("eChook", "Buffer Position out of range, resetting buffer");
+
+                                buffer = new byte[1024];
+                                readBufferPosition = 0;
+                            }else {
+                                readBufferPosition++;
+                            }
+
+                        } else {
 							buffer[readBufferPosition] = b; // still need the delimiter
 							// delimiter reached; flush buffer into the global queue
 							byte[] encodedBytes = new byte[readBufferPosition + 1];
@@ -72,7 +101,8 @@ public class BTStreamReader extends Thread {
 							try {
 								BTDataParser.mHandler.sendEmptyMessage(0);
 							} catch (Exception e) {
-								ACRA.getErrorReporter().handleException(e);
+								EventBus.getDefault().post(new SnackbarEvent(e));
+                                e.printStackTrace();
 							}
 
 							// reset the buffer pointer

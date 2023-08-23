@@ -2,11 +2,8 @@ package com.ben.drivenbluetooth;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 
-/**
- * Created by Ben on 21/08/16.
- */
 public class Splash extends AppCompatActivity{
 
 	@Override

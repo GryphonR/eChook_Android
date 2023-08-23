@@ -3,17 +3,19 @@ package com.ben.drivenbluetooth.threads;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.Log;
 
 import com.ben.drivenbluetooth.Global;
-import com.ben.drivenbluetooth.MainActivity;
+import com.ben.drivenbluetooth.events.ArduinoEvent;
 import com.ben.drivenbluetooth.util.GearHelper;
-import com.ben.drivenbluetooth.util.GraphData;
+//import com.ben.drivenbluetooth.util.GraphData;
 import com.ben.drivenbluetooth.util.RunningAverage;
+
+import org.greenrobot.eventbus.EventBus;
 
 public class BTDataParser extends Thread {
     public static Handler mHandler;
     private byte[] poppedData;
-    private BTDataParserListener mListener;
 
     /* == Amp Hour Variables ==*/
     private double prevAmps = 0.0;
@@ -24,20 +26,6 @@ public class BTDataParser extends Thread {
 
     /* == Distance variables ==*/
     private long prevDistTime = 0;
-
-    /*===================*/
-	/* BTDATAPARSER
-	/*===================*/
-    public BTDataParser(BTDataParserListener listener) {
-        setBTDataParserListener(listener);
-    }
-
-    /*===================*/
-    /* REGISTER LISTENER
-	/*===================*/
-    private synchronized void setBTDataParserListener(BTDataParserListener listener) {
-        mListener = listener;
-    }
 
     /*===================*/
     /* MAIN FUNCS
@@ -64,11 +52,11 @@ public class BTDataParser extends Thread {
                             && poppedData[Global.PACKETLENGTH - 1] == Global.STOPBYTE) { // check if ends with '}'
 
                         /* First send the packet over UDP */
-                        if (MainActivity.mTelemetrySender != null) {
-                            Message packet = Message.obtain();
-                            packet.obj = poppedData;
-                            //MainActivity.mTelemetrySender.PacketHandler.sendMessage(packet);
-                        }
+//                        if (MainActivity.mTelemetrySender != null) {
+//                            Message packet = Message.obtain();
+//                            packet.obj = poppedData;
+//                            //MainActivity.mTelemetrySender.PacketHandler.sendMessage(packet);
+//                        }
 
                         byte firstByte = poppedData[2];
                         byte secondByte = poppedData[3];
@@ -112,6 +100,7 @@ public class BTDataParser extends Thread {
                             firstByte -= 128;
                             value = (double) (firstByte & 0xff) * 100 + (double) (secondByte & 0xff);
                         }
+                        //TODO - Stop BT data coming through in Test Mode
 
                         // Check the ID
                         switch (poppedData[1]) {
@@ -149,28 +138,52 @@ public class BTDataParser extends Thread {
                                 SetGearRatio(value);
                                 break;
                             case Global.LAUNCH_MODE_ID:
-                                _fireActivateLaunchMode();
+                                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.LaunchMode, 0));
                                 break;
                             case Global.CYCLE_VIEW_ID:
-                                _fireCycleView();
+                                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.CycleView, 0));
                                 break;
                             case Global.LOOP_COUNTER_ID:
                                 SetPerformanceMetric(value);
                                 break;
-                            case Global.THROTTLE_MODE_ID:
-                                SetThrottleMode(value);
-                                break;
                             case Global.BRAKE_ID:
                                 SetBrake(value);
                                 break;
-                            case Global.FAN_STATUS_ID:
-                                SetFanStatus(value);
-                                break;
-                            case Global.FAN_DUTY_ID:
-                                SetFanDuty(value);
-                                break;
+//                            case Global.FAN_DUTY_ID:
+//                                SetFanDuty(value);
+//                                break;
                             case Global.STEERING_ID:
                                 SetSteeringAngle(value);
+                                break;
+                            case Global.CUSTOM_0:
+                                SetCustomData(value, 0);
+                                break;
+                            case Global.CUSTOM_1:
+                                SetCustomData(value, 1);
+                                break;
+                            case Global.CUSTOM_2:
+                                SetCustomData(value, 2);
+                                break;
+                            case Global.CUSTOM_3:
+                                SetCustomData(value, 3);
+                                break;
+                            case Global.CUSTOM_4:
+                                SetCustomData(value, 4);
+                                break;
+                            case Global.CUSTOM_5:
+                                SetCustomData(value, 5);
+                                break;
+                            case Global.CUSTOM_6:
+                                SetCustomData(value, 6);
+                                break;
+                            case Global.CUSTOM_7:
+                                SetCustomData(value, 7);
+                                break;
+                            case Global.CUSTOM_8:
+                                SetCustomData(value, 8);
+                                break;
+                            case Global.CUSTOM_9:
+                                SetCustomData(value, 9);
                                 break;
                             default:
                                 Global.MangledDataCount++;
@@ -198,16 +211,13 @@ public class BTDataParser extends Thread {
         if (Global.Lap > 0) {
             Global.LapDataList.get(Global.Lap - 1).AddVolts(rawVolts);
         }
-        GraphData.AddVolts(rawVolts);
-        MainActivity.MainActivityHandler.post(new Runnable() {
-            public void run() {
-                MainActivity.currentFragment.UpdateVolts();
-            }
-        });
+//        GraphData.AddToHistory(rawVolts, Global.VoltsHistory);
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Volts, rawVolts));
     }
 
     private synchronized void SetVoltsAux(final double rawVolts) {
         Global.VoltsAux = rawVolts; // Apply conversion and offset
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.VoltsAux, rawVolts));
     }
 
     private synchronized void SetAmps(final double rawAmps) {
@@ -222,33 +232,25 @@ public class BTDataParser extends Thread {
         prevAmps = rawAmps;
         prevAmpTime = millis;
 
-        Global.Amps = rawAmps; // Apply conversion and offset
         Global.AverageAmps.add(rawAmps);
         if (Global.Lap > 0) {
             Global.LapDataList.get(Global.Lap - 1).AddAmps(rawAmps);
         }
-        GraphData.AddAmps(rawAmps);
+//        GraphData.AddToHistory(rawAmps, Global.AmpsHistory);
 
-		MainActivity.MainActivityHandler.post(new Runnable() {
-			public void run() {
-				MainActivity.currentFragment.UpdateAmps();
-			}
-		});
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Amps, rawAmps));
     }
 
     private synchronized void SetInputThrottle(final double rawThrottle) {
         Global.InputThrottle = rawThrottle; // Apply conversion and offset
-        GraphData.AddInputThrottle(rawThrottle);
+//        GraphData.AddToHistory(rawThrottle, Global.ThrottleHistory);
 
-		MainActivity.MainActivityHandler.post(new Runnable() {
-			public void run() {
-				MainActivity.currentFragment.UpdateThrottle();
-			}
-		});
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.ThrottleInput, rawThrottle));
     }
 
     private synchronized void SetActualThrottle(double rawThrottle) {
         Global.ActualThrottle = rawThrottle; // Apply conversion and offset
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.ThrottleActual, rawThrottle));
     }
 
     private synchronized void SetSpeed(final double rawSpeedMPS) {
@@ -267,13 +269,9 @@ public class BTDataParser extends Thread {
             Global.LapDataList.get(Global.Lap - 1).AddSpeedMPS(Global.SpeedMPS);
         }
 
-        GraphData.AddSpeed(Global.SpeedMPS);
+//        GraphData.AddToHistory(Global.SpeedUnit == Global.UNIT.KPH ? Global.SpeedMPS * 3.6 : Global.SpeedMPS * 2.2, Global.SpeedHistory);
 
-		MainActivity.MainActivityHandler.post(new Runnable() {
-			public void run() {
-				MainActivity.currentFragment.UpdateSpeed();
-			}
-		});
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.WheelSpeedMPS, rawSpeedMPS));
     }
 
     private synchronized void SetMotorRPM(final double rawMotorRPM) {
@@ -281,77 +279,50 @@ public class BTDataParser extends Thread {
         if (Global.Lap > 0) {
             Global.LapDataList.get(Global.Lap - 1).AddRPM(rawMotorRPM);
         }
-        GraphData.AddMotorRPM(rawMotorRPM);
+//        GraphData.AddToHistory(rawMotorRPM, Global.MotorRPMHistory);
 
-		MainActivity.MainActivityHandler.post(new Runnable() {
-			public void run() {
-				MainActivity.currentFragment.UpdateMotorRPM();
-			}
-		});
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.MotorSpeedRPM, rawMotorRPM));
     }
 
     private synchronized void SetTemperature(double rawTemp, final int sensorId) {
         switch (sensorId) {
             case 1:
                 Global.TempC1 = rawTemp;
-                GraphData.AddTemperature(rawTemp, sensorId);
+//                GraphData.AddToHistory(rawTemp, Global.TempC1History);
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.TemperatureA, rawTemp));
                 break;
             case 2:
                 Global.TempC2 = rawTemp;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.TemperatureB, rawTemp));
                 break;
             case 3:
                 Global.TempC3 = rawTemp;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.TemperatureC, rawTemp));
                 break;
             default:
                 break;
         }
-
-        MainActivity.MainActivityHandler.post(new Runnable() {
-            public void run() {
-                MainActivity.currentFragment.UpdateTemp();
-            }
-        });
     }
 
     private synchronized void SetGearRatio(double rawRatio) {
         Global.GearRatio = rawRatio; // Apply conversion and offset
         Global.Gear = GearHelper.GetGear(rawRatio, Global.MotorTeeth, Global.WheelTeeth);
-        MainActivity.UpdateGear(GearHelper.ShiftIndicator(Global.MotorRPM, Global.GearRatio));
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.GearRatio, rawRatio));
     }
 
     private synchronized void SetPerformanceMetric(double pm) {
         Global.PerformanceMetric = pm;
-        MainActivity.MainActivityHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                MainActivity.currentFragment.UpdatePerformanceMetric();
-            }
-        });
-    }
-
-    private synchronized void SetThrottleMode(final double mode) {
-        // 0 == throttle control mode
-        // 1 == current control mode
-        Global.ThrottleMode = mode == 1 ? Global.THROTTLEMODE.CURRENT : Global.THROTTLEMODE.THROTTLE;
-
-        MainActivity.MainActivityHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                MainActivity.currentFragment.UpdateThrottleMode();
-            }
-        });
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.PerformanceMetric, pm));
     }
 
     private synchronized void SetBrake(final double brake) {
         Global.Brake = (int) brake;
-    }
-
-    private synchronized void SetFanStatus(final double fan) {
-        Global.FanStatus = (int) fan;
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.BrakeStatus, brake));
     }
 
     private synchronized void SetFanDuty(final double fan) {
         Global.FanDuty = fan;
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.FanDuty, fan));
     }
 
     private synchronized void SetSteeringAngle(final double angle) {
@@ -368,11 +339,54 @@ public class BTDataParser extends Thread {
             Global.LapDataList.get(Global.Lap - 1).AddAmpHours(ah);
         }
 
-		MainActivity.MainActivityHandler.post(new Runnable() {
-			public void run() {
-                MainActivity.currentFragment.UpdateAmpHours();
-            }
-		});
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.AmpHours, ah));
+    }
+
+    private synchronized void SetCustomData(double rawData, final int dataId) {
+        switch (dataId) {
+            case 0:
+                Global.Custom0 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom0, rawData));
+                break;
+            case 1:
+                Global.Custom1 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom1, rawData));
+                break;
+            case 2:
+                Global.Custom2 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom2, rawData));
+                break;
+            case 3:
+                Global.Custom3 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom3, rawData));
+                break;
+            case 4:
+                Global.Custom4 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom4, rawData));
+                break;
+            case 5:
+                Global.Custom5 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom5, rawData));
+                break;
+            case 6:
+                Global.Custom6 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom6, rawData));
+                break;
+            case 7:
+                Global.Custom7 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom7, rawData));
+                break;
+            case 8:
+                Global.Custom8 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom8, rawData));
+                break;
+            case 9:
+                Global.Custom9 = rawData;
+                EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.Custom9, rawData));
+                break;
+            default:
+                break;
+        }
     }
 
     private synchronized void CalculateWattHours(double volts, double amps, long dt_millis) {
@@ -388,7 +402,9 @@ public class BTDataParser extends Thread {
 
         Global.DistanceMeters += deltaMeters;
 
-        Global.WattHoursPerMeter = WattHourAvg.getAverage() / deltaMeters;
+        double newWH = WattHourAvg.getAverage() / deltaMeters;
+
+        Global.WattHoursPerMeter = newWH;
 
         if (Global.Lap > 0) {
             Global.LapDataList.get(Global.Lap - 1).AddDistanceMeters(deltaMeters);
@@ -397,32 +413,6 @@ public class BTDataParser extends Thread {
 
         WattHourAvg.reset();
 
-        MainActivity.MainActivityHandler.post(new Runnable() {
-            public void run() {
-                MainActivity.currentFragment.UpdateWattHours();
-            }
-        });
-    }
-
-
-
-    /*===================*/
-	/* EVENT RAISERS
-	/*===================*/
-    private synchronized void _fireActivateLaunchMode() {
-        mListener.onActivateLaunchModePacket();
-    }
-
-    private synchronized void _fireCycleView() {
-        mListener.onCycleViewPacket();
-    }
-
-    /*===================*/
-    /* INTERFACE
-	/*===================*/
-    public interface BTDataParserListener {
-        void onCycleViewPacket();
-
-        void onActivateLaunchModePacket();
+        EventBus.getDefault().post(new ArduinoEvent(ArduinoEvent.EventType.WattHours, newWH));
     }
 }

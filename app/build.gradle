@@ -9,30 +9,32 @@ def getVersionCodeTimestamp() {
 }
 
 android {
-    compileSdkVersion 24
-    //buildToolsVersion '25.0.0'
-
-    /*applicationVariants.all { variant ->
-        variant.outputs.each { output ->
-            output.outputFileName = new File(
-                    output.outputFile.parent,
-                    output.outputFile.name.replace("app-release.apk", "echook-companion-release-${variant.versionName}_${variant.versionCode}.apk"))
+    signingConfigs {
+        debug {
+            storeFile file('C:\\Users\\rgriffi5\\Downloads\\android.jks')
+            storePassword 'echook'
+            keyAlias 'jlrdrivenbluetooth'
+            keyPassword 'echook'
         }
-    }*/
+    }
+    compileSdkVersion 30
+    buildToolsVersion '29.0.2'
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "echook-companion-release-${variant.name}-${variant.versionName}.apk"
+            outputFileName = "echook-companion-release-${variant.versionName}_${variant.versionCode}.apk"
         }
     }
 
     defaultConfig {
         applicationId "com.ben.drivenbluetooth"
         minSdkVersion 21
-        targetSdkVersion 24
+        targetSdkVersion 30
         versionCode getVersionCodeTimestamp()
-        versionName "1.95"
+        versionName "2.0.3"
         multiDexEnabled true
+        versionNameSuffix 'beta'
+        signingConfig signingConfigs.debug
     }
     buildTypes {
         release {
@@ -43,25 +45,34 @@ android {
         debug {
             versionNameSuffix "dev"
             debuggable true
+            signingConfig signingConfigs.debug
         }
     }
 }
 
 repositories {
-    maven { url "https://jitpack.io" }
+    maven { url "https://jitpack.io"}
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.google.android.gms:play-services:9.4.0'
-    compile 'com.android.support:design:24.2.1'
-    compile 'ch.acra:acra:4.8.5'
-    compile 'com.github.PhilJay:MPAndroidChart:v2.2.3'
-    compile 'com.getbase:floatingactionbutton:1.10.1'
-    compile 'com.android.support:appcompat-v7:24.2.1'
-    compile 'com.android.support:preference-v7:24.2.1'
-    compile 'com.android.support:preference-v14:24.2.1'
-    compile 'com.android.support:percent:24.2.1'
-    compile 'org.apache.commons:commons-math3:3.6.1'
-    compile 'com.android.support.constraint:constraint-layout:1.0.0-alpha9'
+    // https://developers.google.com/android/guides/setup#split
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    //implementation 'com.google.android.gms:play-services-maps:+'
+    //implementation 'com.google.android.gms:play-services-location:+'
+    implementation 'com.google.android.gms:play-services-maps:17.0.0'
+    implementation 'com.google.android.gms:play-services-location:17.0.0'
+
+//    implementation 'com.github.PhilJay:MPAndroidChart:v3.0.0'
+    implementation 'com.getbase:floatingactionbutton:1.10.1'
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+//    implementation 'com.android.support:appcompat:29.0.2'
+    implementation 'androidx.legacy:legacy-preference-v14:1.0.0'
+    implementation 'com.google.android.material:material:1.2.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.1'
+
+    implementation 'org.apache.commons:commons-math3:3.6.1'
+
+    implementation 'org.greenrobot:eventbus:3.2.0'
+    implementation 'org.jetbrains:annotations-java5:15.0'
 }
